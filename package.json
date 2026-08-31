@@ -1,0 +1,30 @@
+{
+  "name": "st-better-rag-db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync-version": "node scripts/sync-version.mjs",
+    "prebuild": "node scripts/sync-version.mjs",
+    "build": "vite build",
+    "prewatch": "node scripts/sync-version.mjs",
+    "watch": "vite build --watch --mode development",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-tokenize.mjs && node --experimental-strip-types --no-warnings scripts/test-bm25.mjs && node --experimental-strip-types --no-warnings scripts/test-fuse.mjs && node --experimental-strip-types --no-warnings scripts/test-quantize.mjs && node --experimental-strip-types --no-warnings scripts/test-parse.mjs",
+    "test:tokenize": "node --experimental-strip-types --no-warnings scripts/test-tokenize.mjs",
+    "test:bm25": "node --experimental-strip-types --no-warnings scripts/test-bm25.mjs",
+    "test:fuse": "node --experimental-strip-types --no-warnings scripts/test-fuse.mjs",
+    "test:quantize": "node --experimental-strip-types --no-warnings scripts/test-quantize.mjs",
+    "test:parse": "node --experimental-strip-types --no-warnings scripts/test-parse.mjs"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.3.1",
+    "preact": "^10.27.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.2",
+    "@types/node": "^26.4.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.14"
+  }
+}

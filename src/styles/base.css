@@ -1,0 +1,101 @@
+/*
+ * 这份样式经 `?inline` 以字符串形式打进 bundle,再塞进 shadow root ——
+ * Vite 产出的 dist/index.css 不会自动进 shadow root,走 ?inline 可以省掉运行时 fetch。
+ */
+
+.srdb-root {
+  --srdb-bg: #1b1e24;
+  --srdb-surface: #23272f;
+  --srdb-border: #363c47;
+  --srdb-text: #e6e9ef;
+  --srdb-muted: #9aa4b2;
+  --srdb-accent: #5b9dd9;
+  --srdb-danger: #d9705b;
+
+  color: var(--srdb-text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.srdb-launcher {
+  position: fixed;
+  right: 16px;
+  bottom: 96px;
+  z-index: 3000;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--srdb-border);
+  background: var(--srdb-surface);
+  color: var(--srdb-text);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.srdb-launcher:hover {
+  border-color: var(--srdb-accent);
+}
+
+/* 弹窗在 shadow 内用 position: fixed 内联渲染,不用 createPortal 送去 document.body。 */
+.srdb-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 3001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 55%);
+}
+
+.srdb-panel__body {
+  width: min(920px, 92vw);
+  height: min(680px, 86vh);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--srdb-border);
+  border-radius: 10px;
+  background: var(--srdb-bg);
+  overflow: hidden;
+}
+
+.srdb-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--srdb-border);
+}
+
+.srdb-panel__title {
+  font-weight: 600;
+}
+
+.srdb-panel__version {
+  margin-left: 8px;
+  color: var(--srdb-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.srdb-panel__close {
+  border: 0;
+  background: transparent;
+  color: var(--srdb-muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.srdb-panel__close:hover {
+  color: var(--srdb-text);
+}
+
+.srdb-panel__content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.srdb-placeholder {
+  color: var(--srdb-muted);
+}

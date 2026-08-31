@@ -1,0 +1,13 @@
+{
+  "display_name": "Better RAG DB",
+  "loading_order": 101,
+  "requires": [],
+  "optional": [],
+  "js": "dist/index.js?ver=0.1.0",
+  "generate_interceptor": "srdb_generateInterceptor",
+  "author": "sw",
+  "version": "0.1.0",
+  "homePage": "https://github.com/mikeweishuai/ST-better-RAG-DB",
+  "auto_update": false,
+  "minimum_client_version": "1.12.13"
+}
