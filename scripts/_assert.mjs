@@ -1,11 +1,11 @@
-// 零依赖断言。每个 test-*.mjs 用 run() 收集用例,失败即非零退出。
+// 零依赖断言。用例可同步可异步,一律 `await check(...)`。失败即非零退出。
 let failures = 0;
 let total = 0;
 
-export function check(name, fn) {
+export async function check(name, fn) {
   total++;
   try {
-    fn();
+    await fn();
     console.log(`  ok  ${name}`);
   } catch (e) {
     failures++;

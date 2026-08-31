@@ -11,6 +11,10 @@ const packageJson = JSON.parse(
 ) as { version?: string };
 
 export default defineConfig(({ mode }) => ({
+  // 必须是相对基址。默认的 '/' 会把 Worker 写成站点根绝对路径(`/assets/worker-xxx.js`),
+  // 而扩展实际挂在 /scripts/extensions/third-party/<name>/dist/ 下,那样必然 404。
+  base: './',
+
   define: {
     __SRDB_VERSION__: JSON.stringify(String(packageJson.version ?? '0.0.0')),
   },

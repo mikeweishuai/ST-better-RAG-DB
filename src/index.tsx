@@ -1,6 +1,8 @@
 import { render } from 'preact';
 import { App } from '@/ui/App';
-import { whenStReady } from '@/st/context';
+import { getContext, whenStReady } from '@/st/context';
+import { hydrateSettings } from '@/settings';
+import { clearInjection, runRecall, shouldRecallForType } from '@/inject';
 // ?inline 拿到 CSS 字符串,直接塞进 shadow root(见 styles/base.css 顶部说明)
 import baseCss from '@/styles/base.css?inline';
 
@@ -50,16 +52,26 @@ function mount(): void {
  * 生成拦截器:ST 每次生成前会 await 调用 manifest.generate_interceptor 指名的全局函数,
  * 签名 (chat, contextSize, abort, type)。被 await 意味着可以在这里跑完整的异步检索管线,
  * 写完注入槽再放行,不存在「注入赶不上这一轮生成」的竞态。
- *
- * P0 先占位;检索与注入在 P4/P5 接进来。
  */
 (globalThis as Record<string, unknown>).srdb_generateInterceptor = async (
   _chat: unknown,
   _contextSize: number,
   _abort: (immediately: boolean) => void,
-  _type: string | undefined,
+  type: string | undefined,
 ): Promise<void> => {
-  // 任何检索异常都不得阻断对话 —— 这里统一吞掉,失败即当作「本轮无召回」。
+  // 任何检索异常都不得阻断对话 —— runRecall 内部已全部吞掉,这里再兜一层。
+  try {
+    if (shouldRecallForType(type)) await runRecall();
+  } catch (e) {
+    console.error('[srdb] 拦截器异常(放行本次生成)', e);
+  }
 };
 
-void whenStReady().then(mount);
+void whenStReady().then(() => {
+  hydrateSettings();
+  mount();
+
+  // 切聊天时上一轮的召回结果已经不适用,先清空,等下一次生成重新召回
+  const ctx = getContext();
+  ctx?.eventSource?.on(ctx.eventTypes.CHAT_CHANGED ?? 'chat_id_changed', () => clearInjection());
+});

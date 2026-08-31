@@ -36,18 +36,18 @@ function cosine(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-check('l2Normalize 产出单位向量', () => {
+await check('l2Normalize 产出单位向量', () => {
   const v = l2Normalize(new Float32Array([3, 4]));
   near(Math.hypot(v[0], v[1]), 1, 1e-6);
   near(v[0], 0.6, 1e-6);
 });
 
-check('l2Normalize 对零向量原样返回,不产出 NaN', () => {
+await check('l2Normalize 对零向量原样返回,不产出 NaN', () => {
   const z = l2Normalize(new Float32Array([0, 0, 0]));
   ok([...z].every(x => x === 0));
 });
 
-check('量化往返误差 < 1e-2', () => {
+await check('量化往返误差 < 1e-2', () => {
   const rand = rng(42);
   let worst = 0;
   for (let t = 0; t < 20; t++) {
@@ -58,13 +58,13 @@ check('量化往返误差 < 1e-2', () => {
   ok(worst < 1e-2, `最大逐元素误差 ${worst}`);
 });
 
-check('零向量量化 scale 记 0', () => {
+await check('零向量量化 scale 记 0', () => {
   const { q, scale } = quantize(new Float32Array(8));
   eq(scale, 0);
   ok([...q].every(x => x === 0));
 });
 
-check('量化余弦与 Float32 余弦逐对误差 < 1e-2', () => {
+await check('量化余弦与 Float32 余弦逐对误差 < 1e-2', () => {
   const rand = rng(7);
   let worst = 0;
   for (let t = 0; t < 30; t++) {
@@ -75,12 +75,12 @@ check('量化余弦与 Float32 余弦逐对误差 < 1e-2', () => {
   ok(worst < 1e-2, `最大余弦误差 ${worst}`);
 });
 
-check('quantizedCosine 对维度不一致 / 零向量返回 -1', () => {
+await check('quantizedCosine 对维度不一致 / 零向量返回 -1', () => {
   eq(quantizedCosine(quantize(new Float32Array([1, 0])), quantize(new Float32Array([1, 0, 0]))), -1);
   eq(quantizedCosine(quantize(new Float32Array([1, 0])), quantize(new Float32Array([0, 0]))), -1);
 });
 
-check('scanInt8Matrix 的 topK 与 Float32 全精度 topK 高度重合', () => {
+await check('scanInt8Matrix 的 topK 与 Float32 全精度 topK 高度重合', () => {
   const rand = rng(99);
   const dim = 128;
   const count = 400;
@@ -105,7 +105,7 @@ check('scanInt8Matrix 的 topK 与 Float32 全精度 topK 高度重合', () => {
   ok(overlap >= 19, `top20 重合 ${overlap}/20`);
 });
 
-check('scanInt8Matrix 把零向量排到最后', () => {
+await check('scanInt8Matrix 把零向量排到最后', () => {
   const dim = 4;
   const matrix = new Int8Array(2 * dim);
   const scales = new Float32Array([0, 1]);

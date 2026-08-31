@@ -6,16 +6,26 @@
 .srdb-root {
   --srdb-bg: #1b1e24;
   --srdb-surface: #23272f;
+  --srdb-surface-2: #2a2f38;
   --srdb-border: #363c47;
   --srdb-text: #e6e9ef;
   --srdb-muted: #9aa4b2;
   --srdb-accent: #5b9dd9;
+  --srdb-ok: #6cb86c;
   --srdb-danger: #d9705b;
 
   color: var(--srdb-text);
   font-size: 14px;
   line-height: 1.6;
 }
+
+.srdb-root *,
+.srdb-root *::before,
+.srdb-root *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- 入口与面板 ---------- */
 
 .srdb-launcher {
   position: fixed;
@@ -36,7 +46,6 @@
   border-color: var(--srdb-accent);
 }
 
-/* 弹窗在 shadow 内用 position: fixed 内联渲染,不用 createPortal 送去 document.body。 */
 .srdb-panel {
   position: fixed;
   inset: 0;
@@ -44,12 +53,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   background: rgb(0 0 0 / 55%);
 }
 
 .srdb-panel__body {
-  width: min(920px, 92vw);
-  height: min(680px, 86vh);
+  width: min(1100px, 100%);
+  height: min(760px, 100%);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--srdb-border);
@@ -96,6 +106,342 @@
   padding: 16px;
 }
 
+.srdb-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--srdb-border);
+}
+
+.srdb-tab {
+  padding: 8px 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--srdb-muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.srdb-tab:hover {
+  color: var(--srdb-text);
+}
+
+.srdb-tab.is-active {
+  color: var(--srdb-text);
+  border-bottom-color: var(--srdb-accent);
+}
+
+/* ---------- 区块与表单 ---------- */
+
+.srdb-section {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border: 1px solid var(--srdb-border);
+  border-radius: 8px;
+  background: var(--srdb-surface);
+}
+
+.srdb-section__title {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.srdb-section__note {
+  margin: 0 0 12px;
+  color: var(--srdb-muted);
+  font-size: 12px;
+}
+
+.srdb-field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.srdb-field__label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--srdb-muted);
+}
+
+.srdb-field__hint {
+  margin-left: 8px;
+  opacity: 0.75;
+}
+
+.srdb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.srdb-row > .srdb-field {
+  flex: 1 1 160px;
+  margin-bottom: 12px;
+}
+
+.srdb-row--end {
+  justify-content: flex-end;
+}
+
+.srdb-input,
+.srdb-textarea {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--srdb-border);
+  border-radius: 6px;
+  background: var(--srdb-surface-2);
+  color: var(--srdb-text);
+  font: inherit;
+}
+
+.srdb-input:focus,
+.srdb-textarea:focus {
+  outline: none;
+  border-color: var(--srdb-accent);
+}
+
+.srdb-textarea {
+  resize: vertical;
+  margin-bottom: 10px;
+}
+
+.srdb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.srdb-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--srdb-border);
+  border-radius: 6px;
+  background: var(--srdb-surface-2);
+  color: var(--srdb-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.srdb-btn:hover:not(:disabled) {
+  border-color: var(--srdb-accent);
+}
+
+.srdb-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.srdb-btn--primary {
+  border-color: var(--srdb-accent);
+  color: var(--srdb-accent);
+}
+
+.srdb-btn--danger {
+  border-color: var(--srdb-danger);
+  color: var(--srdb-danger);
+}
+
+.srdb-testresult {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--srdb-surface-2);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.srdb-testresult.is-ok {
+  color: var(--srdb-ok);
+}
+
+.srdb-testresult.is-bad {
+  color: var(--srdb-danger);
+}
+
+.srdb-testresult.is-info {
+  color: var(--srdb-muted);
+}
+
 .srdb-placeholder {
   color: var(--srdb-muted);
+  font-size: 13px;
+}
+
+/* ---------- 知识库列表 ---------- */
+
+.srdb-kblist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.srdb-kb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--srdb-border);
+}
+
+.srdb-kb__main {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.srdb-kb__meta {
+  margin-top: 4px;
+  color: var(--srdb-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.srdb-kb__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.srdb-progress {
+  position: relative;
+  height: 22px;
+  margin-top: 12px;
+  border: 1px solid var(--srdb-border);
+  border-radius: 6px;
+  background: var(--srdb-surface-2);
+  overflow: hidden;
+}
+
+.srdb-progress__bar {
+  height: 100%;
+  background: var(--srdb-accent);
+  opacity: 0.3;
+  transition: width 0.15s linear;
+}
+
+.srdb-progress__text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+/* ---------- 调试台 ---------- */
+
+.srdb-meta {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--srdb-muted);
+}
+
+.srdb-term {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--srdb-surface-2);
+  color: var(--srdb-text);
+  font-size: 11px;
+}
+
+/* 四栏并排;窄屏下横向滚动而不是把每栏压扁到不可读 */
+.srdb-cols {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 10px;
+  overflow-x: auto;
+}
+
+.srdb-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--srdb-border);
+  border-radius: 8px;
+  background: var(--srdb-surface);
+}
+
+.srdb-col__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--srdb-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.srdb-col__count {
+  color: var(--srdb-muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.srdb-col__body {
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.srdb-hit {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--srdb-border);
+}
+
+.srdb-hit:last-child {
+  border-bottom: 0;
+}
+
+.srdb-hit__top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--srdb-muted);
+}
+
+.srdb-hit__score {
+  font-variant-numeric: tabular-nums;
+}
+
+.srdb-hit__title {
+  margin-top: 2px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.srdb-hit__preview {
+  margin-top: 2px;
+  color: var(--srdb-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.srdb-tag {
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  background: var(--srdb-surface-2);
+}
+
+/* 双路命中是混合检索真正赚到的部分,给最显眼的颜色 */
+.srdb-tag.is-both {
+  color: var(--srdb-ok);
+}
+
+.srdb-tag.is-bm25 {
+  color: var(--srdb-accent);
+}
+
+.srdb-tag.is-vector {
+  color: #b98fd6;
 }

@@ -237,3 +237,25 @@ export async function loadVectorMatrix(kbId: string): Promise<VectorMatrix | nul
   matrixCache.set(kbId, built);
   return built;
 }
+
+/* ---------- 重建索引用的定点清理 ---------- */
+
+/**
+ * 删掉序号 >= from 的 chunk。
+ * 重建时词条可能变少,新写入按 keyPath 覆盖前面的,尾部残留必须单独清掉。
+ */
+export async function deleteChunksFrom(kbId: string, from: number): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_CHUNKS, 'readwrite');
+  tx.objectStore(STORE_CHUNKS).delete(IDBKeyRange.bound([kbId, from], [kbId, []]));
+  await txDone(tx);
+  invalidateVectorMatrix(kbId);
+}
+
+/** 清空某库的倒排表。序号每次重建都会重排,旧表整体作废,只能清后重写。 */
+export async function clearPostings(kbId: string): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_POSTINGS, 'readwrite');
+  tx.objectStore(STORE_POSTINGS).delete(kbRange(kbId));
+  await txDone(tx);
+}
