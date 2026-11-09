@@ -13,12 +13,14 @@ SillyTavern 第三方前端扩展:把用户导入的设定文档建成 **BM25 + 
 npm run build          # vite build → dist/(prebuild 会同步版本号进 manifest.json)
 npm run watch          # 开发监听
 npm run typecheck      # tsc --noEmit
-npm test               # 全部 7 个套件
-npm run test:bm25      # 单个套件:test:{tokenize,bm25,fuse,quantize,parse,endpoint,inject}
+npm test               # 全部 9 个套件
+npm run test:bm25      # 单个套件:test:{tokenize,bm25,fuse,quantize,parse,endpoint,inject,db,index}
 ```
 
 单测是零框架 node 脚本,靠 `node --experimental-strip-types` 直接加载 `.ts`。断言助手在
 `scripts/_assert.mjs`,用例一律 `await check('名字', fn)`(fn 可同步可异步),结尾 `done('套件名')`。
+需要 Node 22.14+。存储回归用开发依赖 `fake-indexeddb`,不读取浏览器真实数据;
+索引集成回归仅模拟 Worker 与 HTTP 边界,通过 Node 内置的实验性模块 mock 加载。
 
 **没有 lint。** 类型检查 + 单测就是全部门禁。
 
@@ -73,15 +75,19 @@ npm run test:bm25      # 单个套件:test:{tokenize,bm25,fuse,quantize,parse,en
   此时点积即余弦。查询向量**不量化** —— 少一次误差且成本相同。
 - **倒排表按 term 分行存**(`postings` keyPath `[kbId, term]`)。查询只读 query 分词后那
   几十个 term 的行,不反序列化整个索引 —— 这是每轮生成前跑得起 BM25 的前提。
-- **ordinal 每次重建都会重排**,所以倒排表只能整表清空重写(`clearPostings` + `putPostings`),
-  不能增量更新。写入顺序是「先覆盖写 chunks → 删尾部残留 → 清倒排 → 写新倒排」,
-  反过来会在中途失败时留下空库。
+- **ordinal 每次重建都会重排**,所以倒排表只能按库整体重写,不能增量更新。
+  `replaceKbIndex` 在同一个 IndexedDB 事务内替换 chunks、postings、kbmeta,
+  同步写入异常必须主动 abort,异步失败必须等事务回滚;提交成功后才失效向量缓存。
 - **chunkId 的稳定性 = 增量 embed 的正确性**。id 优先用标题 hash(`<kbId>:t<fnv1a(title)>`),
   这样在文件中间插入新词条时后面各条 id 不位移,重导只需 embed 真正变动的条目。
   标题重复时退回序号 id,否则同名词条互相覆盖。
 - **重建杠杆**:`TOKENIZER_VERSION`(分词口径变了 → 倒排作废)与 `embedModel`
   (换模型 → 向量作废),见 `engine/build.ts:needsRebuild`。
 - **BM25-only 是受支持的状态**。未配置 embedding 照样建索引、照样检索,不是错误路径。
+  BM25-only 重建不能沿用旧模型标记,否则重新启用 embedding 后无法补齐新条目的向量。
+
+重导不能仅凭内容指纹返回 unchanged:还须用 `needsRebuild` 检查本地索引、分词版本、
+模型及向量维度。召回时也须核对索引的模型名,同维度不代表相同向量空间。
 
 ## 存储分工
 
@@ -92,6 +98,10 @@ npm run test:bm25      # 单个套件:test:{tokenize,bm25,fuse,quantize,parse,en
 `settings.ts` 有 **`ready` 守门**:ST 就绪后先 `hydrateSettings()` 从服务器读到真实值,
 之后才放行回写。否则模块初始化时的默认值会在用户看到界面前覆盖掉已存配置。
 改设置一律走 `updateSettings(draft => ...)`,它负责浅拷贝 + 持久化。
+
+拦截器传来的 chat 是宿主为本轮处理过的聊天,召回应使用它,不能改读完整 `ctx.chat`
+(swipe 时后者仍包含要被替换的回答)。`clearInjection` 同时取消在途召回并使旧轮次失效;
+CHAT_CHANGED 和 GENERATION_STOPPED 都应调用它,避免迟到结果污染新聊天。
 
 ## 导入约定(影响单测能否运行)
 

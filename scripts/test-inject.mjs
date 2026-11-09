@@ -1,5 +1,53 @@
 import { check, eq, ok, done } from './_assert.mjs';
-import { buildQuery, formatHits, normalizeDepth, shouldRecallForType } from '../src/inject.ts';
+import { register } from 'node:module';
+
+// 只替换检索边界,使测试能控制异步完成顺序,不依赖浏览器 IndexedDB 或真实端点。
+const pipelineUrl = new URL('../src/retrieve/pipeline.ts', import.meta.url).href;
+register(`data:text/javascript,${encodeURIComponent(`
+  export async function load(url, context, nextLoad) {
+    if (url === ${JSON.stringify(pipelineUrl)}) return {
+      format: 'module', shortCircuit: true,
+      source: 'export const retrieve = (...args) => globalThis.__srdbTestRetrieve(...args);',
+    };
+    return nextLoad(url, context);
+  }
+`)}`, import.meta.url);
+
+const {
+  buildQuery, clearInjection, formatHits, normalizeDepth, runRecall, shouldRecallForType,
+} = await import('../src/inject.ts');
+const { defaultSettings, settings } = await import('../src/settings.ts');
+const { lastDebug, lastInjected } = await import('../src/state/runtime.ts');
+
+function outcome(query, document = query) {
+  return {
+    hits: [{ kbId: 'kb', kbName: 'K', ordinal: 0, title: query, document, score: 1 }],
+    debug: { query, terms: [], stages: {}, timings: {}, notes: [], degraded: {} },
+  };
+}
+
+async function withRecallHost(fn) {
+  const previousHost = globalThis.SillyTavern;
+  const previousRetrieve = globalThis.__srdbTestRetrieve;
+  const previousSettings = settings.value;
+  const writes = [];
+  const chat = [{ mes: '宿主中的旧回答' }];
+  globalThis.SillyTavern = {
+    getContext: () => ({ chat, setExtensionPrompt: (...args) => writes.push(args) }),
+  };
+  settings.value = {
+    ...defaultSettings(),
+    kbs: [{ id: 'kb', name: 'K', enabled: true }],
+  };
+  try {
+    await fn({ writes, chat });
+  } finally {
+    clearInjection();
+    settings.value = previousSettings;
+    globalThis.SillyTavern = previousHost;
+    globalThis.__srdbTestRetrieve = previousRetrieve;
+  }
+}
 
 console.log('inject');
 
@@ -54,6 +102,83 @@ await check('shouldRecallForType 跳过不该重复召回的生成类型', () =>
   eq(shouldRecallForType('regenerate'), true);
   eq(shouldRecallForType('quiet'), false);
   eq(shouldRecallForType('impersonate'), false);
+});
+
+await check('runRecall 使用本轮提示词聊天,不把 swipe 舍弃的旧回答放进查询', async () => {
+  await withRecallHost(async ({ writes }) => {
+    const queries = [];
+    globalThis.__srdbTestRetrieve = async query => {
+      queries.push(query);
+      return outcome(query);
+    };
+    await runRecall(undefined, [{ mes: '本轮用户消息' }]);
+    eq(queries, ['本轮用户消息']);
+    ok(writes.at(-1)[1].includes('本轮用户消息'));
+
+    await runRecall();
+    eq(queries.at(-1), '宿主中的旧回答', '无显式 chat 时兼容默认调用');
+  });
+});
+
+await check('切聊天或停止清空注入时,取消请求并拒绝迟到的旧结果', async () => {
+  await withRecallHost(async ({ writes }) => {
+    let finish;
+    let recallSignal;
+    globalThis.__srdbTestRetrieve = (_query, deps) => {
+      recallSignal = deps.signal;
+      return new Promise(resolve => { finish = resolve; });
+    };
+    const pending = runRecall();
+    clearInjection();
+    ok(recallSignal.aborted, '清空必须同时取消在途端点请求');
+    const clearedWriteCount = writes.length;
+    finish(outcome('旧聊天结果'));
+    await pending;
+    eq(writes.length, clearedWriteCount, '不响应取消的异步任务完成后也不得回写');
+    eq(lastInjected.value, '');
+    eq(lastDebug.value, null);
+  });
+});
+
+await check('较旧召回晚于新召回完成时,不能覆盖新结果或清空新注入', async () => {
+  for (const failOld of [false, true]) {
+    await withRecallHost(async ({ writes }) => {
+      let finishOld;
+      globalThis.__srdbTestRetrieve = query => query === '旧轮次'
+        ? new Promise((resolve, reject) => { finishOld = failOld ? reject : resolve; })
+        : Promise.resolve(outcome(query));
+      const old = runRecall(undefined, [{ mes: '旧轮次' }]);
+      await runRecall(undefined, [{ mes: '新轮次' }]);
+      const newWriteCount = writes.length;
+      finishOld(failOld ? new Error('旧请求失败') : outcome('旧轮次'));
+      await old;
+      eq(writes.length, newWriteCount);
+      ok(lastInjected.value.includes('新轮次'));
+      eq(lastDebug.value.query, '新轮次');
+    });
+  }
+});
+
+await check('外部取消后不注入,已取消的 signal 不再发起检索', async () => {
+  await withRecallHost(async () => {
+    const controller = new AbortController();
+    let finish;
+    let calls = 0;
+    let recallSignal;
+    globalThis.__srdbTestRetrieve = (_query, deps) => {
+      calls++;
+      recallSignal = deps.signal;
+      return new Promise(resolve => { finish = resolve; });
+    };
+    const pending = runRecall(controller.signal);
+    controller.abort();
+    ok(recallSignal.aborted);
+    finish(outcome('已取消的结果'));
+    await pending;
+    eq(lastInjected.value, '');
+    await runRecall(controller.signal);
+    eq(calls, 1);
+  });
 });
 
 done('inject');

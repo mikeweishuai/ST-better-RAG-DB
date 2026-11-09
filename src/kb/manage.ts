@@ -5,8 +5,8 @@
  * 两边的唯一纽带是 kbId。
  */
 
-import { buildKbIndex, type BuildProgress, type BuildReport } from '../engine/build.ts';
-import { deleteKb } from '../engine/db.ts';
+import { buildKbIndex, needsRebuild, type BuildProgress, type BuildReport } from '../engine/build.ts';
+import { deleteKb, getMeta } from '../engine/db.ts';
 import { settings, updateSettings } from '../settings.ts';
 import { contentHashOf, parseDocument, fnv1a } from './parse.ts';
 import type { KbEntry } from './types.ts';
@@ -34,7 +34,7 @@ function findEntry(kbId: string): KbEntry | undefined {
 /**
  * 导入或重导一份文档。
  *
- * 重导时若内容指纹未变,直接返回 unchanged,不碰索引也不发任何 embedding 请求。
+ * 内容与本地索引配置都未变化时才跳过,否则换模型或跨设备后会永远无法补建索引。
  */
 export async function importKbFromText(
   raw: string,
@@ -49,7 +49,10 @@ export async function importKbFromText(
 
   const contentHash = contentHashOf(chunks);
   if (existing && existing.contentHash === contentHash) {
-    return { status: 'unchanged', entry: existing };
+    const meta = await getMeta(kbId);
+    if (!needsRebuild(meta, settings.value.embedding.model)) {
+      return { status: 'unchanged', entry: existing };
+    }
   }
 
   const report = await buildKbIndex({

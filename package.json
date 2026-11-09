@@ -10,14 +10,16 @@
     "prewatch": "node scripts/sync-version.mjs",
     "watch": "vite build --watch --mode development",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings scripts/test-tokenize.mjs && node --experimental-strip-types --no-warnings scripts/test-bm25.mjs && node --experimental-strip-types --no-warnings scripts/test-fuse.mjs && node --experimental-strip-types --no-warnings scripts/test-quantize.mjs && node --experimental-strip-types --no-warnings scripts/test-parse.mjs && node --experimental-strip-types --no-warnings scripts/test-endpoint.mjs && node --experimental-strip-types --no-warnings scripts/test-inject.mjs",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-tokenize.mjs && node --experimental-strip-types --no-warnings scripts/test-bm25.mjs && node --experimental-strip-types --no-warnings scripts/test-fuse.mjs && node --experimental-strip-types --no-warnings scripts/test-quantize.mjs && node --experimental-strip-types --no-warnings scripts/test-parse.mjs && node --experimental-strip-types --no-warnings scripts/test-endpoint.mjs && node --experimental-strip-types --no-warnings scripts/test-inject.mjs && node --experimental-strip-types --no-warnings scripts/test-db.mjs && node --experimental-test-module-mocks --experimental-strip-types --no-warnings scripts/test-index.mjs",
     "test:tokenize": "node --experimental-strip-types --no-warnings scripts/test-tokenize.mjs",
     "test:bm25": "node --experimental-strip-types --no-warnings scripts/test-bm25.mjs",
     "test:fuse": "node --experimental-strip-types --no-warnings scripts/test-fuse.mjs",
     "test:quantize": "node --experimental-strip-types --no-warnings scripts/test-quantize.mjs",
     "test:parse": "node --experimental-strip-types --no-warnings scripts/test-parse.mjs",
     "test:endpoint": "node --experimental-strip-types --no-warnings scripts/test-endpoint.mjs",
-    "test:inject": "node --experimental-strip-types --no-warnings scripts/test-inject.mjs"
+    "test:inject": "node --experimental-strip-types --no-warnings scripts/test-inject.mjs",
+    "test:db": "node --experimental-strip-types --no-warnings scripts/test-db.mjs",
+    "test:index": "node --experimental-test-module-mocks --experimental-strip-types --no-warnings scripts/test-index.mjs"
   },
   "dependencies": {
     "@preact/signals": "^2.3.1",
@@ -26,6 +28,7 @@
   "devDependencies": {
     "@preact/preset-vite": "^2.10.2",
     "@types/node": "^26.4.0",
+    "fake-indexeddb": "^6.2.8",
     "typescript": "^5.9.3",
     "vite": "^7.1.14"
   }

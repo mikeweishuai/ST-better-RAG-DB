@@ -58,11 +58,17 @@ function Column(props: { title: string; hits: StageHit[]; empty: string }) {
   );
 }
 
-function Snapshot({ snap }: { snap: DebugSnapshot }) {
+function Snapshot({ snap, source }: { snap: DebugSnapshot; source: 'manual' | 'recall' }) {
   const timings = Object.entries(snap.timings);
   return (
     <>
       <div class="srdb-meta">
+        <div>
+          <strong>来源</strong>:
+          {source === 'recall'
+            ? '上次真实召回(查询由参数指定的最近聊天消息拼接)'
+            : '调试台手动检索(使用输入框内容)'}
+        </div>
         <div>
           <strong>查询</strong>:{snap.query || '(空)'}
         </div>
@@ -111,6 +117,7 @@ export function DebugConsole() {
   const running = useSignal(false);
   const error = useSignal('');
   const snap = useSignal<DebugSnapshot | null>(null);
+  const source = useSignal<'manual' | 'recall'>('manual');
 
   const s = settings.value;
   const activeKbs = s.kbs.filter(k => k.enabled).map(k => ({ id: k.id, name: k.name }));
@@ -139,6 +146,7 @@ export function DebugConsole() {
         debug: true,
       });
       snap.value = outcome.debug;
+      source.value = 'manual';
     } catch (e) {
       error.value = describeError(e);
     } finally {
@@ -168,7 +176,10 @@ export function DebugConsole() {
           <Button onClick={fillFromChat}>取当前对话</Button>
           <Button
             onClick={() => {
-              if (lastDebug.value) snap.value = lastDebug.value;
+              if (lastDebug.value) {
+                snap.value = lastDebug.value;
+                source.value = 'recall';
+              }
             }}
             disabled={!lastDebug.value}
           >
@@ -183,7 +194,7 @@ export function DebugConsole() {
         {error.value && <p class="srdb-testresult is-bad">{error.value}</p>}
       </Section>
 
-      {snap.value && <Snapshot snap={snap.value} />}
+      {snap.value && <Snapshot snap={snap.value} source={source.value} />}
     </div>
   );
 }

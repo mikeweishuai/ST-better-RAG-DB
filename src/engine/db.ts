@@ -85,8 +85,8 @@ export function openDb(): Promise<IDBDatabase> {
 function txDone(tx: IDBTransaction): Promise<void> {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
+    // request 的 error 事件早于事务回滚;等 abort 才能保证调用方看到的是完整旧库。
+    tx.onabort = () => reject(tx.error ?? new DOMException('索引事务已取消', 'AbortError'));
   });
 }
 
@@ -172,6 +172,43 @@ export async function putMeta(meta: KbMetaRecord): Promise<void> {
   const tx = db.transaction(STORE_META, 'readwrite');
   tx.objectStore(STORE_META).put(meta);
   await txDone(tx);
+}
+
+/**
+ * 三个表必须一起提交,否则重导失败时会出现新正文搭配旧倒排/统计量的半份索引。
+ * 所有计算与网络请求应在调用前完成,事务内部只排队写入,以免等待异步工作时自动提交。
+ */
+export async function replaceKbIndex(
+  kbId: string,
+  records: ChunkRecord[],
+  rows: PostingRow[],
+  meta: KbMetaRecord,
+): Promise<void> {
+  if (meta.kbId !== kbId || records.some(r => r.kbId !== kbId)) {
+    throw new Error('索引记录的知识库 ID 不一致');
+  }
+
+  const db = await openDb();
+  const tx = db.transaction([STORE_CHUNKS, STORE_POSTINGS, STORE_META], 'readwrite');
+  const completed = txDone(tx);
+
+  try {
+    const chunks = tx.objectStore(STORE_CHUNKS);
+    const postings = tx.objectStore(STORE_POSTINGS);
+    chunks.delete(kbRange(kbId));
+    postings.delete(kbRange(kbId));
+    for (const record of records) chunks.put(record);
+    for (const row of rows) postings.put({ ...row, kbId } satisfies PostingRecord);
+    tx.objectStore(STORE_META).put(meta);
+  } catch (e) {
+    // DataCloneError 等同步异常不会自动终止事务,必须主动回滚已排队的删除与写入。
+    tx.abort();
+    await completed.catch(() => {});
+    throw e;
+  }
+
+  await completed;
+  invalidateVectorMatrix(kbId);
 }
 
 /* ---------- 清理 ---------- */

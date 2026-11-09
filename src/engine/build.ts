@@ -10,14 +10,9 @@
 import { TOKENIZER_VERSION } from './tokenize.ts';
 import { buildPostingsInWorker, quantizeInWorker } from './workerClient.ts';
 import {
-  clearPostings,
-  deleteChunksFrom,
   getAllChunks,
   getMeta,
-  invalidateVectorMatrix,
-  putChunks,
-  putMeta,
-  putPostings,
+  replaceKbIndex,
   type ChunkRecord,
 } from './db.ts';
 import { embedTexts } from '../retrieve/embed.ts';
@@ -163,24 +158,20 @@ export async function buildKbIndex(opts: BuildOptions): Promise<BuildReport> {
     };
   });
 
-  // 先覆盖写入,再清尾部残留与旧倒排 —— 顺序反过来会在中途失败时留下空库
-  await putChunks(records);
-  await deleteChunksFrom(kbId, total);
-  await clearPostings(kbId);
-  await putPostings(kbId, rows);
-  await putMeta({
+  // 正文、倒排和 ordinal 映射必须作为同一版本提交,失败时保留完整旧库。
+  await replaceKbIndex(kbId, records, rows, {
     kbId,
     N: total,
     avgdl,
     dim,
-    embedModel: bm25Only ? (meta?.embedModel ?? '') : embedCfg.model,
+    // BM25-only 重建可能留下未向量化的新条目,不能继续声称整库匹配旧模型。
+    embedModel: bm25Only ? '' : embedCfg.model,
     tokenizerVersion: TOKENIZER_VERSION,
     ordinalToChunkId: chunks.map(c => c.id),
     docLens,
     updatedAt: Date.now(),
   });
 
-  invalidateVectorMatrix(kbId);
   onProgress?.({ phase: 'done', done: total, total });
 
   return {
@@ -197,10 +188,10 @@ export async function buildKbIndex(opts: BuildOptions): Promise<BuildReport> {
  * 分词口径变了倒排表整体作废;embedding 模型变了向量整体作废。
  */
 export function needsRebuild(
-  meta: { tokenizerVersion: number; embedModel: string } | null,
+  meta: { tokenizerVersion: number; embedModel: string; dim: number } | null,
   currentModel: string,
 ): boolean {
   if (!meta) return true;
   if (meta.tokenizerVersion !== TOKENIZER_VERSION) return true;
-  return !!currentModel && meta.embedModel !== currentModel;
+  return !!currentModel && (meta.embedModel !== currentModel || meta.dim === 0);
 }

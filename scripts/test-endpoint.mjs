@@ -162,6 +162,79 @@ await check('重试后成功则正常返回', async () => {
   });
 });
 
+/** 响应头已经返回,正文持续等待,直到请求 signal 中断。 */
+function stubPendingBody(status = 200, onRead = () => {}) {
+  globalThis.fetch = async (_url, init) => {
+    const read = () => new Promise((_resolve, reject) => {
+      init.signal.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+      onRead();
+    });
+    return { ok: status === 200, status, json: read, text: read };
+  };
+}
+
+for (const status of [200, 500]) {
+  await check(`响应头 HTTP ${status} 已收到但正文挂起时仍会超时`, async () => {
+    stubPendingBody(status);
+    await postJson('https://x/v1/embeddings', cfg({ timeoutSec: 1 }), {}).then(
+      () => ok(false, '本应超时'),
+      e => eq(e.kind, 'timeout'),
+    );
+  });
+}
+
+await check('读取正文期间可以主动取消,不会误报解析错误或重试', async () => {
+  const controller = new AbortController();
+  const reason = new DOMException('用户取消', 'AbortError');
+  let reads = 0;
+  stubPendingBody(200, () => {
+    reads++;
+    controller.abort(reason);
+  });
+  await postJson('https://x/v1/embeddings', cfg({ retries: 2 }), {}, controller.signal).then(
+    () => ok(false, '本应取消'),
+    e => ok(e === reason, '应保留取消原因'),
+  );
+  eq(reads, 1);
+});
+
+await check('请求开始前已取消时不发网络请求', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  const calls = stubFetch(() => jsonResponse({ ok: 1 }));
+  await postJson('https://x/v1/embeddings', cfg(), {}, controller.signal).then(
+    () => ok(false, '本应取消'),
+    e => eq(e.name, 'AbortError'),
+  );
+  eq(calls.length, 0);
+});
+
+await check('重试退避期间取消时立即退出,不等待下一次请求', async () => {
+  const controller = new AbortController();
+  const calls = stubFetch(() => {
+    setTimeout(() => controller.abort(), 0);
+    return jsonResponse({}, 503);
+  });
+  const started = performance.now();
+  await postJson('https://x/v1/embeddings', cfg({ retries: 2 }), {}, controller.signal).then(
+    () => ok(false, '本应取消'),
+    e => eq(e.name, 'AbortError'),
+  );
+  eq(calls.length, 1);
+  ok(performance.now() - started < 400, '取消不应等完 500ms 退避');
+});
+
+await check('无效 JSON 仍归类为 parse', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => { throw new SyntaxError('Unexpected token'); },
+  });
+  await postJson('https://x/v1/embeddings', cfg(), {}).then(
+    () => ok(false, '本应解析失败'),
+    e => eq(e.kind, 'parse'),
+  );
+});
+
 await check('describeError 对每种 kind 都给出可操作的中文说明', () => {
   for (const kind of ['config', 'network', 'timeout', 'auth', 'http', 'parse']) {
     const msg = describeError(new EndpointError(kind, 'detail', 500));

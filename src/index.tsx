@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { App } from '@/ui/App';
-import { getContext, whenStReady } from '@/st/context';
+import { getContext, whenStReady, type StChatMessage } from '@/st/context';
 import { hydrateSettings } from '@/settings';
 import { clearInjection, runRecall, shouldRecallForType } from '@/inject';
 // ?inline 拿到 CSS 字符串,直接塞进 shadow root(见 styles/base.css 顶部说明)
@@ -54,14 +54,14 @@ function mount(): void {
  * 写完注入槽再放行,不存在「注入赶不上这一轮生成」的竞态。
  */
 (globalThis as Record<string, unknown>).srdb_generateInterceptor = async (
-  _chat: unknown,
+  chat: StChatMessage[],
   _contextSize: number,
   _abort: (immediately: boolean) => void,
   type: string | undefined,
 ): Promise<void> => {
   // 任何检索异常都不得阻断对话 —— runRecall 内部已全部吞掉,这里再兜一层。
   try {
-    if (shouldRecallForType(type)) await runRecall();
+    if (shouldRecallForType(type)) await runRecall(undefined, chat);
   } catch (e) {
     console.error('[srdb] 拦截器异常(放行本次生成)', e);
   }
@@ -74,4 +74,6 @@ void whenStReady().then(() => {
   // 切聊天时上一轮的召回结果已经不适用,先清空,等下一次生成重新召回
   const ctx = getContext();
   ctx?.eventSource?.on(ctx.eventTypes.CHAT_CHANGED ?? 'chat_id_changed', () => clearInjection());
+  // 停止时也取消检索,避免端点请求继续等待或把迟到的结果写回注入槽。
+  ctx?.eventSource?.on(ctx.eventTypes.GENERATION_STOPPED ?? 'generation_stopped', () => clearInjection());
 });

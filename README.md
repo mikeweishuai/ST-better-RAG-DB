@@ -36,6 +36,8 @@ SillyTavern/public/scripts/extensions/third-party/ST-better-RAG-DB/
 4. 用 **调试台** 输入一句查询(建议试试包含专有名词的句子),对照四栏命中结果验证检索效果。
 5. 正常对话即可,扩展会在每次生成前自动检索并把结果注入提示词。
 
+用于联调的雾港示例包含[林墨角色卡](examples/starhaven/linmo.character.json)和 [20 条示例知识](examples/starhaven/starhaven.knowledge.md),分别导入 ST 角色管理和 Better RAG DB。
+
 ## 依赖
 
 默认假设已安装:

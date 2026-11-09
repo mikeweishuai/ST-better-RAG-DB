@@ -18,6 +18,9 @@ const SEPARATOR = '\n\n---\n\n';
 
 export const DEFAULT_DEPTH = 4;
 
+let recallVersion = 0;
+let activeRecall: AbortController | null = null;
+
 /**
  * ST 的注入深度上限是 MAX_INJECTION_DEPTH(10000);用户编辑输入框时会出现临时非法值,运行时兜住。
  *
@@ -53,6 +56,11 @@ export function applyInjection(text: string): void {
 }
 
 export function clearInjection(): void {
+  // 取消请求之外还要使旧轮次失效:IndexedDB 等异步操作并不响应 AbortSignal。
+  recallVersion++;
+  activeRecall?.abort();
+  activeRecall = null;
+  lastDebug.value = null;
   applyInjection('');
 }
 
@@ -87,36 +95,46 @@ function paramsFromSettings(): RetrievalParams {
  *
  * 永不抛错 —— 任何检索异常都只会导致本轮无注入,绝不能阻断对话。
  */
-export async function runRecall(signal?: AbortSignal): Promise<void> {
+export async function runRecall(signal?: AbortSignal, chat?: StChatMessage[]): Promise<void> {
+  clearInjection();
   const s = settings.value;
-  if (!s.enabled) {
-    clearInjection();
-    return;
-  }
+  if (!s.enabled || signal?.aborted) return;
 
   const kbs = s.kbs.filter(k => k.enabled).map(k => ({ id: k.id, name: k.name }));
-  if (!kbs.length) {
-    clearInjection();
-    return;
-  }
+  if (!kbs.length) return;
 
   const ctx = getContext();
   if (!ctx) return;
 
+  const version = recallVersion;
+  const controller = new AbortController();
+  activeRecall = controller;
+  const onAbort = () => controller.abort(signal?.reason);
+  signal?.addEventListener('abort', onAbort, { once: true });
+  const isCurrent = () => version === recallVersion && !controller.signal.aborted;
+
   try {
-    const query = buildQuery(ctx.chat ?? [], s.retrieval.queryMessageCount);
+    // 宿主传来的 chat 已排除 swipe 的旧回答,也已应用提示词正则与附件处理。
+    const query = buildQuery(chat ?? ctx.chat ?? [], s.retrieval.queryMessageCount);
     const outcome = await retrieve(query, {
       params: paramsFromSettings(),
       embedCfg: s.embedding,
       rerankCfg: s.rerank,
       kbs,
-      ...(signal ? { signal } : {}),
+      signal: controller.signal,
+      // “看上次真实召回”复用这份结果,必须保留各栏标题与摘要,而不是只存内部编号。
+      debug: true,
     });
+    if (!isCurrent() || !settings.value.enabled) return;
     lastDebug.value = outcome.debug;
     applyInjection(formatHits(outcome.hits));
   } catch (e) {
+    if (!isCurrent()) return;
     console.error('[srdb] 召回异常,本轮不注入', e);
     clearInjection();
+  } finally {
+    signal?.removeEventListener('abort', onAbort);
+    if (activeRecall === controller) activeRecall = null;
   }
 }
 

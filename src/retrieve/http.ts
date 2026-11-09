@@ -80,7 +80,21 @@ function isRetryable(e: unknown): boolean {
   return e.kind === 'http' && (e.status === 429 || (e.status ?? 0) >= 500);
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
+  return new Promise((resolve, reject) => {
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 /** 单次请求:超时用 AbortController,外部 signal 取消也走同一条链路。 */
 async function postJsonOnce(
@@ -90,14 +104,14 @@ async function postJsonOnce(
   timeoutSec: number,
   signal?: AbortSignal,
 ): Promise<unknown> {
+  signal?.throwIfAborted();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1, timeoutSec) * 1000);
   const onAbort = () => controller.abort();
   signal?.addEventListener('abort', onAbort);
 
-  let res: Response;
   try {
-    res = await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -106,28 +120,32 @@ async function postJsonOnce(
       body: JSON.stringify(body),
       signal: controller.signal,
     });
+
+    // fetch 返回时只收到了响应头;正文读取也必须受超时与取消约束,否则会一直拖住生成。
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 300);
+      if (res.status === 401 || res.status === 403) {
+        throw new EndpointError('auth', detail, res.status);
+      }
+      throw new EndpointError('http', detail || res.statusText, res.status);
+    }
+
+    try {
+      return await res.json();
+    } catch (e) {
+      // 中断与网络断流需要保留类别,不能被 JSON 解析失败掩盖。
+      if (controller.signal.aborted || e instanceof TypeError) throw e;
+      throw new EndpointError('parse', e instanceof Error ? e.message : String(e));
+    }
   } catch (e) {
     // 外部主动取消要原样抛出,不能被当成超时吞掉
-    if (signal?.aborted) throw e;
+    if (signal?.aborted) throw signal.reason;
     if (controller.signal.aborted) throw new EndpointError('timeout', `请求超过 ${timeoutSec}s`);
+    if (e instanceof EndpointError) throw e;
     throw new EndpointError('network', e instanceof Error ? e.message : String(e));
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
-  }
-
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    if (res.status === 401 || res.status === 403) {
-      throw new EndpointError('auth', detail, res.status);
-    }
-    throw new EndpointError('http', detail || res.statusText, res.status);
-  }
-
-  try {
-    return await res.json();
-  } catch (e) {
-    throw new EndpointError('parse', e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -147,7 +165,7 @@ export async function postJson(
     } catch (e) {
       last = e;
       if (signal?.aborted || i === attempts - 1 || !isRetryable(e)) throw e;
-      await sleep(Math.min(8000, 500 * 2 ** i));
+      await sleep(Math.min(8000, 500 * 2 ** i), signal);
     }
   }
   throw last;
