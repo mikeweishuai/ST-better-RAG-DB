@@ -163,12 +163,12 @@ export function DebugConsole() {
     <div>
       <Section
         title="检索调试台"
-        note="这里只跑检索,不会写入注入槽,也不影响正在进行的对话。"
+        note="这里只跑检索，不会写入注入槽，也不影响正在进行的对话。"
       >
         <textarea
           class="srdb-textarea"
           rows={3}
-          placeholder="输入一句查询,建议试试含专名的 —— 那正是 BM25 相对向量的优势所在"
+          placeholder="输入一句样例文本查询"
           value={query.value}
           onInput={e => (query.value = (e.target as HTMLTextAreaElement).value)}
         />

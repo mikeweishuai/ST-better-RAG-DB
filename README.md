@@ -1,5 +1,9 @@
 # ST-better-RAG-DB
 
+ST静态知识库插件，旨在用尽可能小的成本提高召回质量。相比ST原版知识库多了BM25和reranking。纯前端解决方案。
+
+以下为AI写的readme：
+
 SillyTavern 知识库插件:**BM25 + embedding 混合检索 + rerank 精排**,生成前自动把相关设定注入提示词。
 
 
