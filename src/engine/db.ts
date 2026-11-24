@@ -120,6 +120,18 @@ export async function getAllChunks(kbId: string): Promise<ChunkRecord[]> {
   return rows as ChunkRecord[];
 }
 
+export async function getChunkPage(
+  kbId: string,
+  startOrdinal: number,
+  limit: number,
+): Promise<Pick<ChunkRecord, 'ordinal' | 'title' | 'text'>[]> {
+  const db = await openDb();
+  const tx = db.transaction(STORE_CHUNKS, 'readonly');
+  const range = IDBKeyRange.bound([kbId, startOrdinal], [kbId, []]);
+  const rows: ChunkRecord[] = await reqDone(tx.objectStore(STORE_CHUNKS).getAll(range, limit));
+  return rows.map(({ ordinal, title, text }) => ({ ordinal, title, text }));
+}
+
 /** 按序号取若干条正文(检索命中后回捞用)。 */
 export async function getChunksByOrdinal(kbId: string, ordinals: number[]): Promise<ChunkRecord[]> {
   if (!ordinals.length) return [];

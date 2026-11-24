@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { check, eq, ok, done } from './_assert.mjs';
 import {
   getAllChunks,
+  getChunkPage,
   getMeta,
   getPostingRows,
   loadVectorMatrix,
@@ -83,6 +84,20 @@ await check('首次建库同时提交正文、倒排与统计量,并保留类型
   ok(stored.records[0].vec instanceof Int8Array, '向量应保留 Int8Array 类型');
   eq(stored.rows, value.rows.map(row => ({ ...row, kbId: 'first' })));
   eq(stored.meta, value.meta);
+});
+
+await check('预览按序号限量读取指定知识库的标题和完整正文', async () => {
+  await replace('preview', fixture('preview', ['甲', '乙', '丙']));
+  await replace('preview-other', fixture('preview-other', ['另一库']));
+  eq(await getChunkPage('preview', 0, 2), [
+    { ordinal: 0, title: '甲', text: '正文 甲' },
+    { ordinal: 1, title: '乙', text: '正文 乙' },
+  ]);
+  eq(await getChunkPage('preview', 2, 2), [
+    { ordinal: 2, title: '丙', text: '正文 丙' },
+  ]);
+  eq(await getChunkPage('preview', 3, 2), []);
+  eq(await getChunkPage('preview-missing', 0, 2), []);
 });
 
 await check('重建删掉旧正文尾部与全部旧倒排,仅保留新版本统计量', async () => {

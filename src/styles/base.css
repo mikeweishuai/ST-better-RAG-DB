@@ -295,6 +295,23 @@
   min-width: 0;
 }
 
+.srdb-kb__name {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--srdb-accent);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.srdb-kb__name:hover {
+  text-decoration: underline;
+}
+
 .srdb-kb__meta {
   margin-top: 4px;
   color: var(--srdb-muted);
@@ -307,6 +324,98 @@
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.srdb-kb__rename {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.srdb-kb__rename .srdb-input {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.srdb-preview {
+  position: fixed;
+  inset: 0;
+  width: min(760px, calc(100% - 32px));
+  max-height: min(680px, calc(100% - 32px));
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--srdb-border);
+  border-radius: 10px;
+  background: var(--srdb-bg);
+  color: var(--srdb-text);
+}
+
+.srdb-preview[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.srdb-preview::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+.srdb-preview__head {
+  flex: none;
+  gap: 12px;
+}
+
+.srdb-preview__title {
+  margin: 0;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.srdb-preview__content {
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px;
+}
+
+.srdb-preview__content:focus-visible {
+  outline: 1px solid var(--srdb-accent);
+  outline-offset: -1px;
+}
+
+.srdb-preview__entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.srdb-preview__entry {
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+
+.srdb-preview__entry + .srdb-preview__entry {
+  border-top: 1px solid var(--srdb-border);
+}
+
+.srdb-preview__entry h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.srdb-preview__entry p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.srdb-preview__pages {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--srdb-border);
 }
 
 .srdb-progress {

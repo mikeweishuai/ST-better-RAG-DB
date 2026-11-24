@@ -5,7 +5,8 @@ import { importKbFromFile, removeKb, renameKb, setKbEnabled } from '@/kb/manage'
 import { CHUNK_COUNT_WARN, isCancelled, type BuildProgress } from '@/engine/build';
 import { describeError } from '@/retrieve/http';
 import { indexing } from '@/state/runtime';
-import { Button, Section, TextInput, Toggle } from './controls';
+import { Button, Section, Toggle } from './controls';
+import { LibraryPreview } from './LibraryPreview';
 
 const PHASE_LABEL: Record<BuildProgress['phase'], string> = {
   diff: '对账',
@@ -34,8 +35,12 @@ export function Libraries() {
   const abort = useSignal<AbortController | null>(null);
   /** 非空时表示这次选文件是要重导到该库,而不是新建 */
   const reimportTarget = useSignal<string | null>(null);
+  const previewId = useSignal<string | null>(null);
+  const renameId = useSignal<string | null>(null);
 
   const busy = indexing.value !== null;
+  const libraries = settings.value.kbs;
+  const previewKb = libraries.find(kb => kb.id === previewId.value);
 
   const pick = (kbId: string | null) => {
     reimportTarget.value = kbId;
@@ -114,16 +119,46 @@ export function Libraries() {
           </p>
         )}
 
-        {!settings.value.kbs.length && <p class="srdb-placeholder">还没有导入任何知识库。</p>}
+        {!libraries.length && <p class="srdb-placeholder">还没有导入任何知识库。</p>}
 
         <ul class="srdb-kblist">
-          {settings.value.kbs.map(kb => (
+          {libraries.map(kb => (
             <li class="srdb-kb" key={kb.id}>
               <div class="srdb-kb__main">
-                <TextInput value={kb.name} onCommit={v => renameKb(kb.id, v)} />
+                <button
+                  class="srdb-kb__name"
+                  type="button"
+                  aria-haspopup="dialog"
+                  title="预览条目"
+                  onClick={() => { previewId.value = kb.id; }}
+                >
+                  {kb.name}
+                </button>
                 <div class="srdb-kb__meta">
                   {kb.chunkCount} 条 · 来自 {kb.sourceName} · 指纹 {kb.contentHash}
                 </div>
+                {renameId.value === kb.id && (
+                  <form
+                    class="srdb-kb__rename"
+                    onSubmit={e => {
+                      e.preventDefault();
+                      renameKb(kb.id, String(new FormData(e.currentTarget).get('name') ?? ''));
+                      renameId.value = null;
+                    }}
+                  >
+                    <input
+                      class="srdb-input"
+                      name="name"
+                      aria-label="新的知识库名称"
+                      defaultValue={kb.name}
+                      autoFocus
+                    />
+                    <button class="srdb-btn srdb-btn--primary" type="submit">保存</button>
+                    <button class="srdb-btn" type="button" onClick={() => { renameId.value = null; }}>
+                      取消
+                    </button>
+                  </form>
+                )}
               </div>
               <div class="srdb-kb__actions">
                 <Toggle
@@ -131,6 +166,7 @@ export function Libraries() {
                   label={kb.enabled ? '参与召回' : '已停用'}
                   onToggle={v => setKbEnabled(kb.id, v)}
                 />
+                <Button onClick={() => { renameId.value = kb.id; }}>重命名</Button>
                 <Button disabled={busy} onClick={() => pick(kb.id)}>
                   重导
                 </Button>
@@ -150,6 +186,9 @@ export function Libraries() {
           ))}
         </ul>
       </Section>
+      {previewKb && (
+        <LibraryPreview key={previewKb.id} kb={previewKb} onClose={() => { previewId.value = null; }} />
+      )}
     </div>
   );
 }
